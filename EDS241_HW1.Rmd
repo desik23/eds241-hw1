@@ -1,0 +1,172 @@
+---
+title: "EDS241: Assignment 1"
+author: "Desik Somasundaram"
+date: '`r format(Sys.time(), "%m/%d/%Y")`'
+output: 
+  pdf_document:
+    toc: false
+    number_sections: yes
+header-includes:
+  - \setlength{\parindent}{1em}
+  - \usepackage{float}
+--- 
+  
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE}
+
+# set default chunk options
+knitr::opts_chunk$set(fig.width = 4, fig.height = 3, 
+                      echo = TRUE, message = FALSE, warning = FALSE)
+
+
+# load packages
+packages=c("stargazer", "here", "tidyverse","stringr", "janitor", 
+           "cowplot", "ggplot2", "tinytex", "datasets", "tibble", "readxl","estimatr", "car", "huxtable")
+
+for (i in packages) {
+  if (require(i,character.only=TRUE)==FALSE) {
+    install.packages(i,repos='http://cran.us.r-project.org')
+  }
+  else {
+    require(i,character.only=TRUE)
+  }
+}
+
+#devtools::install_github('rstudio/rmarkdown')
+options(scipen=10) # not scientific notation
+
+
+```
+
+\noindent The data for this assignment come from CalEnviroScreen 4.0, a mapping and data tool produced by the California Office of Environmental Health Hazards Assessment (OEHHA). The data are compiled and constructed from a variety of sources and cover all 8,035 census tracts in California. Source: https://oehha.ca.gov/calenviroscreen/report/calenviroscreen-40
+
+# Clean and plot data
+
+\noindent The following code loads and cleans the data.
+
+```{r , include=TRUE}
+
+# Load data
+CESdata <- read_excel("CES4.xlsx", sheet = 1, na = "NA")
+
+
+# Clean data
+CESdata <-janitor::clean_names(CESdata)
+
+
+```
+
+\noindent What is the average concentration of PM2.5 across all census tracts in California? 
+
+```{r , include=TRUE}
+(avgPM25 <- round(mean(CESdata$pm2_5),3))
+
+```
+The average concentration of PM2.5 across all census tracts in California is ***`r avgPM25` micrograms per cubic meters***. 
+
+
+\noindent What county has the highest level of poverty in California?
+
+```{r , include=TRUE}
+CESdata_summary <- CESdata %>% 
+                   group_by(california_county) %>% 
+                   mutate(wm_poverty = weighted.mean(poverty, total_population)) 
+highestpovertycounty <- CESdata_summary[which.max(CESdata_summary$wm_poverty),3]
+```
+Using a weighted mean apporach that considers poverty and total population, the county has the highest level of poverty in California is ***`r highestpovertycounty`***. 
+
+
+\noindent Make a histogram depicting the distribution of percent low birth weight and PM2.5. 
+
+```{r , include=TRUE}
+
+# Histogram
+
+lowbwhist <- ggplot(CESdata, aes(x=CESdata$low_birth_weight))+
+  geom_histogram()+
+  labs(x = "% Low Birth Weight", y = "Count") 
+
+PM25hist <- ggplot(CESdata, aes(x=CESdata$pm2_5))+
+  geom_histogram()+
+  labs(x = "Ambient PM2.5 Level", y = "Count") 
+
+```
+
+\newpage
+<center>**Figure 1: Percent Low Birth Weight Distribution in CA Census Tracts**</center>
+```{r , fig.width = 4, fig.height = 3, eval=TRUE, echo=FALSE}
+lowbwhist
+```
+\newpage
+<center>**Figure 2: Ambient PM2.5 Level Distribution in CA Census Tracts**</center>
+```{r , fig.width = 4, fig.height = 3, eval=TRUE, echo=FALSE}
+PM25hist
+```
+
+\noindent Figure 1 shows an approximately normal distribution for percent low birth weights while Figure 2 shows an approximately bimodal normal distribution for ambient PM2.5 levels.
+
+# Run and interpret regression models
+
+\noindent Estimate a OLS regression of LowBirthWeight on PM2.5. Report the estimated slope
+coefficient and its heteroskedasticity-robust standard error. Interpret the estimated slope
+coefficient. Is the effect of PM2.5 on LowBirthWeight statistically significant at the 5%? 
+
+\begin{align}
+  Y_{i} = \beta_0 + \beta_1 X_{1i} + u_{i}
+\end{align}
+
+\noindent where $Y_{i}$ is LowBirthWeight $i$, $X_{1i}$ is the PM2.5 level, and $u_{i}$ the regression error term. We will consider a regression including only PM2.5, and a regression including PM2.5 and Poverty.
+
+\medskip
+
+\noindent In R, we run the following code: 
+
+```{r , include=TRUE}
+model_1 <- lm_robust(formula = low_birth_weight ~ pm2_5, data=CESdata)
+```
+
+\noindent Table 1 shows the estimated coefficients from estimating equation (1). 
+
+```{r , results = 'asis', echo = FALSE}
+huxreg(model_1)
+```
+
+\noindent In model (1), the estimated $\beta_{1}$ coefficient implies that a 1  microgram per cubic meter increase in pm2_5 increases percent of
+census tract births with weight less than 2500g by 0.118. The effect of PM2.5 on LowBirthWeight is ***statistically significant at the 5%***.
+
+
+
+\noindent ) Add the variable Poverty as an explanatory variable to the regression in (d). Interpret the
+estimated coefficient on Poverty. What happens to the estimated coefficient on PM25,
+compared to the regression in (d). Explain. 
+
+\begin{align}
+  Y_{i} = \beta_0 + \beta_1 X_{1i} + \beta_2 X_{2i} + u_{i}
+\end{align}
+
+\noindent here $Y_{i}$ is LowBirthWeight $i$, $X_{1i}$ is the PM2.5 level, $X_{2i}$ is the poverty level and $u_{i}$ the regression error term. 
+
+\medskip
+
+\noindent In R, we run the following code: 
+
+```{r , include=TRUE}
+
+model_2 <- lm_robust(formula = low_birth_weight ~ pm2_5 + poverty, data=CESdata)
+
+```
+
+\noindent Table 2 shows the estimated coefficients from estimating equation (2). 
+
+```{r , results = 'asis', echo = FALSE}
+huxreg(model_2)
+```
+
+\noindent In model (2), the estimated $\beta_{1}$ coefficient implies that a 1  microgram per cubic meter increase in pm2_5 increases percent of
+census tract births with weight less than 2500g by 0.059. the estimated $\beta_{2}$ coefficient implies that a 1 percent increase in poverty rate within a census tract increases percent of census tract births with weight less than 2500g by 0.027. The effect of PM2.5 on LowBirthWeight is still ***statistically significant at the 5%*** and the effect of Poverty on LowBirthWeight is also ***statistically significant at the 5%***. Adding the Poverty in model (2) reduces $\hat{\beta_{1}}$ from 0.118 to 0.059. This is likely due to omitted variable bias in model (1) which that more heavily weighs the effect of PM2.5 in the absence of other important variables such as Poverty. 
+
+\noindent Table 3 shows results from the linear hypothesis test whether the effect of PM2.5 and Poverty on LowBirthWeight are equivalent. 
+```{r}
+linearHypothesis(model_2,c("pm2_5 = poverty"), white.adjust = "hc2")
+```
+
+\noindent Based on the p-value, we reject the null that the effect of PM2.5 and Poverty are equal. 
